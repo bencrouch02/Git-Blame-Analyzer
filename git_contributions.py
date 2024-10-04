@@ -31,8 +31,8 @@ def get_git_blame(file_path):
         return None
 
 def count_contributions(files_to_check):
-    """Count the number of lines each author contributed to each specified file, excluding empty lines and Ruby comments."""
-    contributions = defaultdict(lambda: defaultdict(int))  # contributions[author][file] = line_count
+    """Count the actual lines of code each author contributed to each specified file."""
+    contributions = defaultdict(lambda: defaultdict(list))  # contributions[author][file] = list_of_lines
     in_multiline_comment = False  # Track whether we are inside a multi-line comment block
 
     for file in files_to_check:
@@ -68,33 +68,40 @@ def count_contributions(files_to_check):
                 # Exclude empty lines and single-line comments (lines that start with #)
                 if actual_code_line and not actual_code_line.startswith("#"):
                     if author:  # Only tally if we have an author name
-                        contributions[author][file] += 1
+                        contributions[author][file].append(actual_code_line)
 
     return contributions
 
+def store_contributions_in_files(contributions, output_dir="author_contributions"):
+    """Store the actual code contributions in separate files for each author in a specified folder."""
+    # Create the folder if it does not exist
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+
+    for author, files in contributions.items():
+        # Create a file for the author in the specified output directory
+        file_name = os.path.join(output_dir, f"{author}_contributions.rb")
+        with open(file_name, "w") as author_file:
+            for file, lines in files.items():
+                author_file.write(f"## File: {file}\n")
+                for line in lines:
+                    author_file.write(f"{line}\n")  # Use !r to preserve white space
+                author_file.write("\n")
+
 def print_contributions(contributions):
-    """Print the contributions in a human-readable format, including totals."""
+    """Print the number of lines each author contributed without printing actual code."""
     if not contributions:
         print("No contributions found.")
         return
 
-    # Dictionary to store total lines per author
-    total_contributions = defaultdict(int)
-
     for author, files in contributions.items():
         print(f"Author: {author}")
         total_lines = 0
-        for file, line_count in files.items():
-            print(f"  {file}: {line_count} lines")
-            total_lines += line_count
-        total_contributions[author] = total_lines
+        for file, lines in files.items():
+            print(f"  {file}: {len(lines)} lines")
+            total_lines += len(lines)
         print(f"  Total lines: {total_lines}")
         print()
-
-    # Print overall totals for each author
-    print("Summary of Total Contributions:")
-    for author, total_lines in total_contributions.items():
-        print(f"Author: {author}, Total lines: {total_lines}")
 
 if __name__ == "__main__":
     # Ensure there is at least one file argument
@@ -113,6 +120,9 @@ if __name__ == "__main__":
 
     # Run the contribution count function
     contributions = count_contributions(files_to_check)
+
+    # Store the contributions in files in the specified directory
+    store_contributions_in_files(contributions)
 
     # Print the contributions, including totals
     print_contributions(contributions)
